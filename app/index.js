@@ -3,9 +3,10 @@ import { View, Text, TouchableOpacity, Image } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
-import { collection, addDoc, getDocs } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { collection, addDoc, getDocs, deleteDoc, doc } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage } from '../firebase';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function App() {
   const [location, setLocation] = useState(null);
@@ -14,12 +15,13 @@ export default function App() {
 
   useEffect(() => {
     (async () => {
+      // Request permission to access location of the device
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         console.error('Permission to access location was denied');
         return;
       }
-
+      // Get current location
       let location = await Location.getCurrentPositionAsync({});
       setLocation(location.coords);
 
@@ -30,17 +32,18 @@ export default function App() {
     })();
   }, []);
 
+  // Handle long press on the map -> creates new marker with selected image
   const handleLongPress = async (event) => {
     const { coordinate } = event.nativeEvent;
     
-    // Pick an image
+    // Open image picker
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [4, 3],
       quality: 1,
     });
-
+    // If image is selected
     if (!result.canceled) {
       // Upload image to Firebase Storage
       const response = await fetch(result.assets[0].uri);
@@ -49,7 +52,7 @@ export default function App() {
       const storageRef = ref(storage, filename);
       await uploadBytes(storageRef, blob);
 
-      // Get download URL
+      // Get download URL (the url of the uploaded image)
       const downloadURL = await getDownloadURL(storageRef);
 
       // Save marker data to Firestore
@@ -60,24 +63,47 @@ export default function App() {
       };
       const docRef = await addDoc(collection(db, 'markers'), markerData);
 
-      // Update local state
+      // Save marker to Firebase and update local state
       setMarkers([...markers, { id: docRef.id, ...markerData }]);
     }
   };
 
+  // If location is not loaded, show loading screen
   if (!location) {
     return <View className="flex-1 items-center justify-center"><Text>Loading...</Text></View>;
   }
 
+  // Handle delete
+  const handleDelete = async (marker) => {
+    try {
+      // Delete from Firestore
+      await deleteDoc(doc(db, 'markers', marker.id));
+      
+      // Delete from Storage
+      const imageRef = ref(storage, marker.imageUrl);
+      await deleteObject(imageRef).catch((error) => {
+        console.log("Error deleting image:", error);
+      });
+  
+      // Update the local state by filtering out the deleted marker
+      setMarkers(markers.filter(m => m.id !== marker.id));
+      setSelectedMarker(null);
+    } catch (error) {
+      console.error("Error deleting marker:", error);
+    }
+  };
+
+
   return (
     <View className="flex-1">
+      {/* MapView component */}
       <MapView
         className="flex-1"
         initialRegion={{
           latitude: location.latitude,
           longitude: location.longitude,
-          latitudeDelta: 0.0922,
-          longitudeDelta: 0.0421,
+          latitudeDelta: 1,
+          longitudeDelta: 1,
         }}
         onLongPress={handleLongPress}
       >
@@ -89,16 +115,36 @@ export default function App() {
           />
         ))}
       </MapView>
+      {/* If a marker is selected, show the image in a modal */}
       {selectedMarker && (
-        <View className="absolute bottom-0 left-0 right-0 bg-white p-4">
-          <TouchableOpacity onPress={() => setSelectedMarker(null)}>
-            <Text className="text-blue-500 mb-2">Close</Text>
-          </TouchableOpacity>
-          <Image
-            source={{ uri: selectedMarker.imageUrl }}
-            className="w-full h-40"
-            resizeMode="cover"
-          />
+        <View 
+          className="absolute top-0 left-0 right-0 bottom-0 bg-black/50" 
+          style={{ height: '100%', width: '100%', position: 'absolute', justifyContent: 'center', alignItems: 'center'}}
+        >
+          <View className="bg-white p-4 pt-12 rounded-lg w-[80%] relative">
+            {/* Close button */}
+            <TouchableOpacity 
+              onPress={() => setSelectedMarker(null)}
+              className="absolute right-2 top-2 z-10 bg-white rounded-full w-8 h-8 items-center justify-center shadow-sm"
+            >
+              <Text className="text-lg font-bold">×</Text>
+            </TouchableOpacity>
+            
+            {/* Delete button */}
+            <TouchableOpacity 
+              onPress={() => handleDelete(selectedMarker)}
+              className="absolute left-2 top-2 z-10 bg-white rounded-full px-3 py-1 items-center justify-center shadow-sm"
+            >
+              <Ionicons name="trash" size={24} color="red" />
+            </TouchableOpacity>
+
+            {/* Selected marker image */}
+            <Image
+              source={{ uri: selectedMarker.imageUrl }}
+              className="w-full h-72 rounded"
+              resizeMode="cover"
+            />
+          </View>
         </View>
       )}
     </View>
