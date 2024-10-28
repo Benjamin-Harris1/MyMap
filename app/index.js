@@ -137,8 +137,7 @@ export default function App() {
       {/* If a marker is selected, show the image in a modal */}
       {selectedMarker && (
         <View 
-          className="absolute top-0 left-0 right-0 bottom-0 bg-black/50" 
-          style={{ height: '100%', width: '100%', position: 'absolute', justifyContent: 'center', alignItems: 'center'}}
+          className="absolute top-0 left-0 right-0 bottom-0 bg-black/50 h-full w-full justify-center items-center" 
         >
           <View className="bg-white p-4 pt-12 rounded-lg w-[80%] relative">
             {/* Close button */}
