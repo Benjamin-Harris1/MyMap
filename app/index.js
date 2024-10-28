@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, Image } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 import * as Location from 'expo-location';
@@ -12,6 +12,7 @@ export default function App() {
   const [location, setLocation] = useState(null);
   const [markers, setMarkers] = useState([]);
   const [selectedMarker, setSelectedMarker] = useState(null);
+  const mapRef = useRef(null);
 
   useEffect(() => {
     (async () => {
@@ -93,11 +94,21 @@ export default function App() {
     }
   };
 
+  const goToCurrentLocation = async () => {
+    let location = await Location.getCurrentPositionAsync({});
+    mapRef.current.animateToRegion({
+      latitude: location.coords.latitude,
+      longitude: location.coords.longitude,
+      latitudeDelta: 0.01,
+      longitudeDelta: 0.01,
+    });
+  };
 
   return (
     <View className="flex-1">
       {/* MapView component */}
       <MapView
+        ref={mapRef}
         className="flex-1"
         initialRegion={{
           latitude: location.latitude,
@@ -115,6 +126,14 @@ export default function App() {
           />
         ))}
       </MapView>
+      {/* Go to current location button */}
+      <TouchableOpacity 
+        onPress={goToCurrentLocation}
+        className="absolute bottom-8 right-4 bg-white rounded-full w-12 h-12 items-center justify-center shadow-lg"
+      >
+        <Ionicons name="locate" size={24} color="#0ea5e9" />
+      </TouchableOpacity>
+      
       {/* If a marker is selected, show the image in a modal */}
       {selectedMarker && (
         <View 
