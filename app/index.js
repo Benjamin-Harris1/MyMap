@@ -131,9 +131,9 @@ export default function App() {
         onPress={goToCurrentLocation}
         className="absolute bottom-8 right-4 bg-white rounded-full w-12 h-12 items-center justify-center shadow-lg"
       >
-        <Ionicons name="locate" size={24} color="#0ea5e9" />
+        <Ionicons name="locate" size={24} color="blue" />
       </TouchableOpacity>
-      
+
       {/* If a marker is selected, show the image in a modal */}
       {selectedMarker && (
         <View 
